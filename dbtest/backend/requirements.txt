@@ -1,0 +1,14 @@
+fastapi
+onnxruntime
+uvicorn
+pyodbc
+pydantic
+pydantic[email]
+passlib[bcrypt]
+opencv-python
+numpy
+tensorflow
+pillow
+huggingface_hub
+rembg
+python-multipart
