@@ -1,0 +1,609 @@
+import React, { useCallback, useState } from 'react';
+import { Dimensions, StyleSheet, View, Text, TouchableOpacity, Image, ScrollView } from 'react-native';
+import { GestureDetector, Gesture } from 'react-native-gesture-handler';
+import Animated, {
+    useSharedValue,
+    useAnimatedStyle,
+    withSpring,
+    withTiming,
+    runOnJS,
+} from 'react-native-reanimated';
+import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
+import { storeData } from '../constants/storeData';
+import { useStoreAnimation } from '../context/StoreAnimationContext';
+
+const { height: SCREEN_HEIGHT } = Dimensions.get('window');
+const MAX_TRANSLATE_Y = -SCREEN_HEIGHT + 60;
+
+export default function GlobalStoreSheet() {
+    const router = useRouter();
+    const { translateY, maxSnapPoint, showBackdrop } = useStoreAnimation();
+    const context = useSharedValue({ y: 0 });
+    const isOpen = useSharedValue(false);
+
+    // Navigation State
+    const [currentView, setCurrentView] = useState<'brands' | 'categories' | 'clothes'>('brands');
+    const [selectedBrandId, setSelectedBrandId] = useState<string | null>(null);
+    const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
+
+    const SNAP_POINT_50 = -SCREEN_HEIGHT * 0.5;
+    const SNAP_POINT_70 = -SCREEN_HEIGHT * 0.7;
+
+    const scrollTo = useCallback((destination: number) => {
+        'worklet';
+        translateY.value = withSpring(destination, {
+            damping: 50,
+            stiffness: 200,
+            mass: 1
+        });
+    }, []);
+
+    const gesture = Gesture.Pan()
+        .onStart(() => {
+            context.value = { y: translateY.value };
+        })
+        .onUpdate((event) => {
+            translateY.value = event.translationY + context.value.y;
+            // Determine max limit based on maxSnapPoint
+            const maxLimit = maxSnapPoint.value === -1 ? SNAP_POINT_70 : maxSnapPoint.value;
+            translateY.value = Math.max(translateY.value, maxLimit - 50);
+        })
+        .onEnd((event) => {
+            const velocityY = event.velocityY;
+            const currentY = translateY.value;
+
+            // Determine available snap points based on maxSnapPoint
+            const maxLimit = maxSnapPoint.value === -1 ? SNAP_POINT_70 : maxSnapPoint.value;
+            const SNAP_POINTS = maxLimit === SNAP_POINT_50
+                ? [0, SNAP_POINT_50]
+                : [0, SNAP_POINT_50, SNAP_POINT_70];
+
+            // Find closest snap point
+            let dest = SNAP_POINTS[0];
+
+            if (Math.abs(velocityY) > 500) {
+                // Velocity based snapping
+                if (velocityY < 0) {
+                    // Moving up
+                    if (maxLimit === SNAP_POINT_50) {
+                        dest = SNAP_POINT_50;
+                    } else {
+                        if (currentY > SNAP_POINT_50) dest = SNAP_POINT_50;
+                        else dest = SNAP_POINT_70;
+                    }
+                } else {
+                    // Moving down
+                    if (currentY < SNAP_POINT_50) dest = SNAP_POINT_50;
+                    else dest = 0;
+                }
+            } else {
+                // Position based snapping
+                let minDistance = Number.MAX_VALUE;
+                for (const point of SNAP_POINTS) {
+                    const distance = Math.abs(currentY - point);
+                    if (distance < minDistance) {
+                        minDistance = distance;
+                        dest = point;
+                    }
+                }
+            }
+
+            scrollTo(dest);
+            isOpen.value = dest !== 0;
+        });
+
+    const rBottomSheetStyle = useAnimatedStyle(() => {
+        return {
+            transform: [{ translateY: translateY.value }],
+        };
+    });
+
+    const rBackdropStyle = useAnimatedStyle(() => {
+        return {
+            opacity: withTiming(isOpen.value && showBackdrop.value ? 0.7 : 0),
+            zIndex: isOpen.value ? 1 : -1,
+        };
+    });
+
+    const closeSheet = useCallback(() => {
+        scrollTo(0);
+        isOpen.value = false;
+        // Reset navigation after closing
+        setTimeout(() => {
+            setCurrentView('brands');
+            setSelectedBrandId(null);
+            setSelectedCategoryId(null);
+        }, 300);
+    }, []);
+
+    const handleBack = () => {
+        if (currentView === 'clothes') {
+            setCurrentView('categories');
+            setSelectedCategoryId(null);
+        } else if (currentView === 'categories') {
+            setCurrentView('brands');
+            setSelectedBrandId(null);
+        } else {
+            closeSheet();
+        }
+    };
+
+    const navigateToBrand = (brandId: string) => {
+        setSelectedBrandId(brandId);
+        setCurrentView('categories');
+    };
+
+    const navigateToCategory = (categoryId: string) => {
+        setSelectedCategoryId(categoryId);
+        setCurrentView('clothes');
+    };
+
+    const getTitle = () => {
+        if (currentView === 'brands') return 'Brands';
+        if (currentView === 'categories') return storeData.brands.find(b => b.id === selectedBrandId)?.name || 'Categories';
+        if (currentView === 'clothes') return storeData.categories[selectedCategoryId!]?.name || 'Clothes';
+        return 'Store';
+    };
+
+    const renderContent = () => {
+        if (currentView === 'brands') {
+            return (
+                <View style={styles.grid}>
+                    {storeData.brands.map((brand) => (
+                        <TouchableOpacity
+                            key={brand.id}
+                            style={styles.card}
+                            onPress={() => navigateToBrand(brand.id)}
+                            activeOpacity={0.8}
+                        >
+                            <Ionicons name="pricetag" size={28} color="#FFD700" style={{ marginBottom: 10 }} />
+                            <Text style={styles.brandName}>{brand.name}</Text>
+                            <Text style={styles.brandDesc} numberOfLines={2}>
+                                {brand.description}
+                            </Text>
+                        </TouchableOpacity>
+                    ))}
+                </View>
+            );
+        }
+
+        if (currentView === 'categories') {
+            const brand = storeData.brands.find(b => b.id === selectedBrandId);
+            if (!brand) return null;
+            return (
+                <View style={styles.listContainer}>
+                    {brand.categories.map((catId) => {
+                        const category = storeData.categories[catId];
+                        if (!category) return null;
+                        return (
+                            <TouchableOpacity
+                                key={catId}
+                                style={styles.listItem}
+                                onPress={() => navigateToCategory(catId)}
+                            >
+                                <View style={styles.listItemContent}>
+                                    <Text style={styles.listItemTitle}>{category.name}</Text>
+                                    <Text style={styles.listItemSubtitle}>{category.description}</Text>
+                                </View>
+                                <Ionicons name="chevron-forward" size={20} color="#666" />
+                            </TouchableOpacity>
+                        );
+                    })}
+                </View>
+            );
+        }
+
+        if (currentView === 'clothes') {
+            const clothes = (selectedBrandId && selectedCategoryId)
+                ? storeData.clothes[selectedBrandId]?.[selectedCategoryId] || []
+                : [];
+
+            return (
+                <View style={styles.grid}>
+                    {clothes.map((item) => (
+                        <View key={item.id} style={styles.itemCard}>
+                            <Image source={{ uri: item.image }} style={styles.itemImage} />
+                            <View style={styles.itemInfo}>
+                                <Text style={styles.itemPrice}>{item.price}</Text>
+                                <Text style={styles.itemName} numberOfLines={1}>{item.name}</Text>
+                            </View>
+                            <TouchableOpacity
+                                style={styles.addToWishlistButton}
+                                onPress={() => {
+                                    // Add to wishlist logic here
+                                    console.log('Add to wishlist:', item.name);
+                                }}
+                            >
+                                <Ionicons name="heart-outline" size={16} color="#fff" />
+                            </TouchableOpacity>
+                        </View>
+                    ))}
+                </View>
+            );
+        }
+    };
+
+    return (
+        <>
+            <Animated.View style={[styles.backdrop, rBackdropStyle]} />
+            <GestureDetector gesture={gesture}>
+                <Animated.View style={[styles.bottomSheetContainer, rBottomSheetStyle]}>
+                    <View style={styles.handle} />
+
+                    <View style={styles.header}>
+                        <View style={styles.titleContainer}>
+                            {currentView !== 'brands' ? (
+                                <TouchableOpacity onPress={handleBack} style={styles.backButton}>
+                                    <Ionicons name="arrow-back" size={24} color="#fff" />
+                                </TouchableOpacity>
+                            ) : (
+                                <Ionicons name="bag-handle" size={24} color="#FF69B4" />
+                            )}
+                            <Text style={styles.title}>{getTitle()}</Text>
+                        </View>
+                        <View style={{ flexDirection: 'row', gap: 10 }}>
+                            <TouchableOpacity onPress={() => router.push('/store/wishlist')} style={styles.wishlistButton}>
+                                <Ionicons name="heart-outline" size={20} color="#fff" />
+                            </TouchableOpacity>
+                            <TouchableOpacity onPress={closeSheet} style={styles.closeButton}>
+                                <Ionicons name="close" size={20} color="#fff" />
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+
+                    <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 50 }}>
+                        {renderContent()}
+                    </ScrollView>
+                </Animated.View>
+            </GestureDetector>
+        </>
+    );
+}
+
+const styles = StyleSheet.create({
+    backdrop: {
+        ...StyleSheet.absoluteFillObject,
+        backgroundColor: 'black',
+    },
+    bottomSheetContainer: {
+        height: SCREEN_HEIGHT,
+        width: '100%',
+        backgroundColor: '#1a1a1a', // Dark theme
+        position: 'absolute',
+        top: SCREEN_HEIGHT - 60,
+        borderTopLeftRadius: 30,
+        borderTopRightRadius: 30,
+        zIndex: 1000,
+    },
+    handle: {
+        width: 40,
+        height: 4,
+        backgroundColor: '#444',
+        alignSelf: 'center',
+        marginVertical: 10,
+        borderRadius: 2,
+    },
+    header: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 20,
+        marginTop: 10,
+        paddingHorizontal: 20,
+    },
+    titleContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+    },
+    backButton: {
+        padding: 4,
+    },
+    title: {
+        fontSize: 24,
+        fontWeight: 'bold',
+        color: '#fff',
+    },
+    closeButton: {
+        backgroundColor: '#333',
+        padding: 8,
+        borderRadius: 20,
+    },
+    grid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        justifyContent: 'space-between',
+        paddingHorizontal: 20,
+    },
+    card: {
+        width: '47%',
+        backgroundColor: '#2a2a2a',
+        borderRadius: 20,
+        padding: 15,
+        alignItems: 'center',
+        marginBottom: 15,
+        borderWidth: 1,
+        borderColor: '#333',
+    },
+    brandName: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        color: '#fff',
+        marginBottom: 5,
+    },
+    brandDesc: {
+        fontSize: 12,
+        color: '#aaa',
+        textAlign: 'center',
+        lineHeight: 16,
+    },
+    listContainer: {
+        gap: 10,
+        paddingHorizontal: 20,
+    },
+    listItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        backgroundColor: '#2a2a2a',
+        padding: 15,
+        borderRadius: 15,
+        borderWidth: 1,
+        borderColor: '#333',
+    },
+    listItemContent: {
+        flex: 1,
+    },
+    listItemTitle: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        color: '#fff',
+    },
+    listItemSubtitle: {
+        fontSize: 12,
+        color: '#aaa',
+        marginTop: 2,
+    },
+    itemCard: {
+        width: '47%',
+        backgroundColor: '#2a2a2a',
+        borderRadius: 15,
+        marginBottom: 15,
+        overflow: 'hidden',
+        borderWidth: 1,
+        borderColor: '#333',
+    },
+    itemImage: {
+        width: '100%',
+        height: 150,
+        backgroundColor: '#333',
+    },
+    itemInfo: {
+        padding: 10,
+    },
+    itemPrice: {
+                        );
+                    })}
+                </View >
+            );
+        }
+
+if (currentView === 'clothes') {
+    const clothes = (selectedBrandId && selectedCategoryId)
+        ? storeData.clothes[selectedBrandId]?.[selectedCategoryId] || []
+        : [];
+
+    return (
+        <View style={styles.grid}>
+            {clothes.map((item) => (
+                <View key={item.id} style={styles.itemCard}>
+                    <Image source={{ uri: item.image }} style={styles.itemImage} />
+                    <View style={styles.itemInfo}>
+                        <Text style={styles.itemPrice}>{item.price}</Text>
+                        <Text style={styles.itemName} numberOfLines={1}>{item.name}</Text>
+                    </View>
+                    <TouchableOpacity
+                        style={styles.addToWishlistButton}
+                        onPress={() => {
+                            // Add to wishlist logic here
+                            console.log('Add to wishlist:', item.name);
+                        }}
+                    >
+                        <Ionicons name="heart-outline" size={16} color="#fff" />
+                    </TouchableOpacity>
+                </View>
+            ))}
+        </View>
+    );
+}
+    };
+
+return (
+    <>
+        <Animated.View style={[styles.backdrop, rBackdropStyle]} />
+        <GestureDetector gesture={gesture}>
+            <Animated.View style={[styles.bottomSheetContainer, rBottomSheetStyle]}>
+                <View style={styles.handle} />
+
+                <View style={styles.header}>
+                    <View style={styles.titleContainer}>
+                        {currentView !== 'brands' ? (
+                            <TouchableOpacity onPress={handleBack} style={styles.backButton}>
+                                <Ionicons name="arrow-back" size={24} color="#fff" />
+                            </TouchableOpacity>
+                        ) : (
+                            <Ionicons name="bag-handle" size={24} color="#FF69B4" />
+                        )}
+                        <Text style={styles.title}>{getTitle()}</Text>
+                    </View>
+                    <View style={{ flexDirection: 'row', gap: 10 }}>
+                        <TouchableOpacity onPress={() => router.push('/store/wishlist')} style={styles.wishlistButton}>
+                            <Ionicons name="heart-outline" size={20} color="#fff" />
+                        </TouchableOpacity>
+                        <TouchableOpacity onPress={closeSheet} style={styles.closeButton}>
+                            <Ionicons name="close" size={20} color="#fff" />
+                        </TouchableOpacity>
+                    </View>
+                </View>
+
+                <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 50 }}>
+                    {renderContent()}
+                </ScrollView>
+            </Animated.View>
+        </GestureDetector>
+    </>
+);
+}
+
+const styles = StyleSheet.create({
+    backdrop: {
+        ...StyleSheet.absoluteFillObject,
+        backgroundColor: 'black',
+    },
+    bottomSheetContainer: {
+        height: SCREEN_HEIGHT,
+        width: '100%',
+        backgroundColor: '#1a1a1a', // Dark theme
+        position: 'absolute',
+        top: SCREEN_HEIGHT - 60,
+        borderTopLeftRadius: 30,
+        borderTopRightRadius: 30,
+        zIndex: 1000,
+    },
+    handle: {
+        width: 40,
+        height: 4,
+        backgroundColor: '#444',
+        alignSelf: 'center',
+        marginVertical: 10,
+        borderRadius: 2,
+    },
+    header: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 20,
+        marginTop: 10,
+        paddingHorizontal: 20,
+    },
+    titleContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+    },
+    backButton: {
+        padding: 4,
+    },
+    title: {
+        fontSize: 24,
+        fontWeight: 'bold',
+        color: '#fff',
+    },
+    closeButton: {
+        backgroundColor: '#333',
+        padding: 8,
+        borderRadius: 20,
+    },
+    grid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        justifyContent: 'space-between',
+        paddingHorizontal: 20,
+    },
+    card: {
+        width: '47%',
+        backgroundColor: '#2a2a2a',
+        borderRadius: 20,
+        padding: 15,
+        alignItems: 'center',
+        marginBottom: 15,
+        borderWidth: 1,
+        borderColor: '#333',
+    },
+    brandName: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        color: '#fff',
+        marginBottom: 5,
+    },
+    brandDesc: {
+        fontSize: 12,
+        color: '#aaa',
+        textAlign: 'center',
+        lineHeight: 16,
+    },
+    listContainer: {
+        gap: 10,
+        paddingHorizontal: 20,
+    },
+    listItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        backgroundColor: '#2a2a2a',
+        padding: 15,
+        borderRadius: 15,
+        borderWidth: 1,
+        borderColor: '#333',
+    },
+    listItemContent: {
+        flex: 1,
+    },
+    listItemTitle: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        color: '#fff',
+    },
+    listItemSubtitle: {
+        fontSize: 12,
+        color: '#aaa',
+        marginTop: 2,
+    },
+    itemCard: {
+        width: '47%',
+        backgroundColor: '#2a2a2a',
+        borderRadius: 15,
+        marginBottom: 15,
+        overflow: 'hidden',
+        borderWidth: 1,
+        borderColor: '#333',
+    },
+    itemImage: {
+        width: '100%',
+        height: 150,
+        backgroundColor: '#333',
+    },
+    itemInfo: {
+        padding: 10,
+    },
+    itemPrice: {
+        fontSize: 16,
+        fontWeight: 'bold',
+        color: '#FFD700',
+    },
+    itemName: {
+        fontSize: 12,
+        color: '#ccc',
+        marginTop: 4,
+    },
+    wishlistButton: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: 'rgba(255, 255, 255, 0.1)',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    addToWishlistButton: {
+        position: 'absolute',
+        top: 8,
+        right: 8,
+        width: 30,
+        height: 30,
+        borderRadius: 15,
+        backgroundColor: 'rgba(255, 105, 180, 0.9)',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+});

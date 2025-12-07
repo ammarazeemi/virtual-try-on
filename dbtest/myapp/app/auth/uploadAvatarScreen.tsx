@@ -4,13 +4,13 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    Image,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  Image,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import API from "../../config/apiConfig";
 import { types } from "util";
@@ -67,13 +67,21 @@ export default function UploadAvatarScreen() {
         type: "image/jpeg",
       } as any);
 
+      console.log("Uploading to:", API.GENERATE_AVATAR);
       const res = await fetch(API.GENERATE_AVATAR, {
         method: "POST",
         body: formData,
       });
 
       const data = await res.json();
-      if (!res.ok) throw new Error(data.detail || "Generate failed");
+      console.log("Upload response:", data);
+
+      if (!res.ok) {
+        const errorMessage = typeof data.detail === 'object'
+          ? JSON.stringify(data.detail)
+          : (data.detail || "Generate failed");
+        throw new Error(errorMessage);
+      }
 
       router.push({
         pathname: "/auth/avatarResultScreen",
@@ -83,8 +91,8 @@ export default function UploadAvatarScreen() {
         },
       });
     } catch (err: any) {
-      console.error(err);
-      Alert.alert("Error", err.message);
+      console.error("Upload Error:", err);
+      Alert.alert("Error", err.message || JSON.stringify(err));
     } finally {
       setUploading(false);
     }

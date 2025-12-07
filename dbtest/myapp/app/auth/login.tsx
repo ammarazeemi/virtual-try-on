@@ -51,7 +51,7 @@ export default function LoginPage() {
         Alert.alert("Login Failed", data?.detail || "Invalid credentials");
         return;
       }
-            // ✅ Expect backend to return: { user_id, name, first_login }
+      // ✅ Expect backend to return: { user_id, name, first_login }
       const { user_id, name } = data;
 
       Alert.alert("Success", `Welcome back, ${name}!`);
@@ -60,25 +60,16 @@ export default function LoginPage() {
       await AsyncStorage.setItem("userId", String(user_id));
 
       if (data.first_login) {
-        router.replace({
-          pathname: "/auth/uploadAvatarScreen", //avatar wali screen me bhej do
-          params: { userId: user_id },
-        });
+        router.replace("/home");
       } else {
-        // router.replace("/auth/avatarResultScreen");
-                router.replace({
-          pathname: "/auth/uploadAvatarScreen",//store wali screen me bhej do
-          params: { userId: user_id },
-        });
-
-        
+        router.replace("/home");
       }
       // if (first_login) {
       //   // 🚀 Navigate to avatar upload screen
       //   router.replace({
       //     pathname: "/UploadAvatarScreen",
       //     params: { userId: user_id },
-      
+
       //   });
       // } else {
       //   // 🚀 Normal flow (already has avatar)
