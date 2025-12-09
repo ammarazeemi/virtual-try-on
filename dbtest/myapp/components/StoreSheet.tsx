@@ -1,9 +1,10 @@
-import React, { useCallback, useState } from 'react';
-import { Dimensions, StyleSheet, View, Text, TouchableOpacity, Image, ScrollView, Alert } from 'react-native';
-import { GestureDetector, Gesture } from 'react-native-gesture-handler';
+import React, { useCallback, useState, ComponentType } from 'react';
+import { Dimensions, StyleSheet, View, Text, TouchableOpacity, Image, ScrollView as RNScrollView, Alert } from 'react-native';
+import { GestureDetector, Gesture, ScrollView as GestureHandlerScrollView } from 'react-native-gesture-handler';
 import Animated, {
     useSharedValue,
     useAnimatedStyle,
+    useAnimatedScrollHandler,
     withSpring,
     withTiming,
 } from 'react-native-reanimated';
@@ -27,8 +28,11 @@ export default function GlobalStoreSheet() {
     const [selectedBrandId, setSelectedBrandId] = useState<string | null>(null);
     const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
 
-    const SNAP_POINT_50 = -SCREEN_HEIGHT * 0.5;
+    const SNAP_POINT_50 = -SCREEN_HEIGHT * 0.3;
     const SNAP_POINT_70 = -SCREEN_HEIGHT * 0.7;
+
+    const scrollRef = React.useRef<any>(null);
+    const scrollOffset = useSharedValue(0);
 
     const scrollTo = useCallback((destination: number) => {
         'worklet';
@@ -39,14 +43,30 @@ export default function GlobalStoreSheet() {
         });
     }, []);
 
+    const scrollHandler = useAnimatedScrollHandler((event) => {
+        scrollOffset.value = event.contentOffset.y;
+    });
     const gesture = Gesture.Pan()
+        .manualActivation(false)
+        .activeOffsetX([-20, 20])
+        .simultaneousWithExternalGesture(scrollRef)
         .onStart(() => {
             context.value = { y: translateY.value };
         })
         .onUpdate((event) => {
-            translateY.value = event.translationY + context.value.y;
+            const newY = event.translationY + context.value.y;
             const maxLimit = maxSnapPoint.value === -1 ? SNAP_POINT_70 : maxSnapPoint.value;
-            translateY.value = Math.max(translateY.value, maxLimit - 50);
+            if (event.translationY < 0) {
+                translateY.value = Math.max(newY, maxLimit);
+            }
+            else {
+                if (scrollOffset.value <= 0) {
+                    translateY.value = Math.min(newY, 0);
+                }
+                else {
+                    translateY.value = maxLimit;
+                }
+            }
         })
         .onEnd((event) => {
             const velocityY = event.velocityY;
@@ -124,11 +144,13 @@ export default function GlobalStoreSheet() {
     const navigateToBrand = (brandId: string) => {
         setSelectedBrandId(brandId);
         setCurrentView('categories');
+        expandSheet();
     };
 
     const navigateToCategory = (categoryId: string) => {
         setSelectedCategoryId(categoryId);
         setCurrentView('clothes');
+        expandSheet();
     };
 
     const handleUploadClothes = async () => {
@@ -169,6 +191,12 @@ export default function GlobalStoreSheet() {
         }
         return 'Store';
     };
+    // Function to expand the sheet to 70% when navigating
+    const expandSheet = useCallback(() => {
+        'worklet'; // Ensure this is callable from worklets if needed, but here it's fine outside.
+        scrollTo(SNAP_POINT_70);
+    }, [scrollTo, SNAP_POINT_70]); // Add this new function
+
 
     const renderContent = () => {
         if (currentView === 'brands') {
@@ -180,6 +208,7 @@ export default function GlobalStoreSheet() {
                             style={styles.card}
                             onPress={() => navigateToBrand(brand.id)}
                         >
+                            <Image source={{ uri: brand.image }} style={styles.brandstyle} />
                             <Text style={styles.brandName}>{brand.name}</Text>
                             <Text style={styles.brandDesc}>{brand.description}</Text>
                         </TouchableOpacity>
@@ -220,7 +249,7 @@ export default function GlobalStoreSheet() {
                     <View style={styles.grid}>
                         {clothes.map((item) => (
                             <View key={item.id} style={styles.itemCard}>
-                                <Image source={{ uri: item.image }} style={styles.itemImage} />
+                                <Image source={item.image} style={styles.itemImage} />
                                 <View style={styles.itemInfo}>
                                     <Text style={styles.itemPrice}>{item.price}</Text>
                                     <Text style={styles.itemName} numberOfLines={1}>{item.name}</Text>
@@ -275,14 +304,15 @@ export default function GlobalStoreSheet() {
                         </View>
                     </View>
 
-                    <ScrollView
+                    <GestureHandlerScrollView
+                        ref={scrollRef}
                         showsVerticalScrollIndicator={false}
                         scrollEnabled={true}
                         bounces={false}
-                        contentContainerStyle={{ paddingBottom: 100, paddingTop: 10 }}
+                        contentContainerStyle={{ paddingBottom: 150, paddingTop: 10 }}
                     >
                         {renderContent()}
-                    </ScrollView>
+                    </GestureHandlerScrollView>
                 </Animated.View>
             </GestureDetector>
         </>
@@ -365,6 +395,14 @@ const styles = StyleSheet.create({
         marginBottom: 15,
         borderWidth: 1,
         borderColor: '#333',
+    },
+    brandstyle: {
+        width: 80,
+        height: 80,
+        borderRadius: 40,
+        marginBottom: 10,
+        backgroundColor: '#444',
+        resizeMode: 'cover',
     },
     brandName: {
         fontSize: 18,
