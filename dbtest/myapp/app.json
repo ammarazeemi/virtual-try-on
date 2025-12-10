@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "myApp",
-    "slug": "myApp",
+    "slug": "virtual-try-on",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -43,6 +43,13 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "12577ae3-67eb-4de7-8c9f-18d2f6948851"
+      }
+    },
+    "owner": "ammarazeemi002s-organization"
   }
 }
