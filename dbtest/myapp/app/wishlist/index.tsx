@@ -49,7 +49,11 @@ export default function WishlistPage() {
                         <View style={styles.grid}>
                             {wishlist.map((item) => (
                                 <View key={item.id} style={styles.itemCard}>
-                                    <Image source={{ uri: item.image }} style={styles.itemImage} />
+                                    {typeof item.image === 'string' ? (
+                                        <Image source={{ uri: item.image }} style={styles.itemImage} />
+                                    ) : (
+                                        <View style={[styles.itemImage, { backgroundColor: '#ccc' }]} />
+                                    )}
                                     <View style={styles.itemInfo}>
                                         <Text style={styles.itemName} numberOfLines={1}>
                                             {item.name}

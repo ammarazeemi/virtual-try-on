@@ -1,12 +1,11 @@
 import React, { useState } from "react";
 import { Alert, StyleSheet, Text, TextInput, TouchableOpacity, View, ActivityIndicator } from "react-native";
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from "expo-router";
 import API from "../../config/apiConfig";
 
-// Define the IP address once to make it easier to change
-//const API_URL = "http://192.168.0.136:8000"; 
-
 export default function ResetPassword() {
+    const router = useRouter();
     const [email, setEmail] = useState("");
     const [code, setCode] = useState("");
     const [newPassword, setNewPassword] = useState("");
@@ -43,27 +42,27 @@ export default function ResetPassword() {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ email: email.trim(), code: code.trim(), new_password: newPassword.trim() }),
             });
-            
+
             const data = await res.json();
 
             if (res.status === 404) {
-                 // Handle specific 404 case, e.g., if the user endpoint is missing
+                // Handle specific 404 case, e.g., if the user endpoint is missing
                 throw new Error("Reset service temporarily unavailable.");
             }
             if (!res.ok) {
                 // Use a more descriptive error from the backend if available
                 throw new Error(data.detail || data.message || "Password reset failed. Check your code or try again.");
             }
-            
-            Alert.alert("Success 🎉", data.message || "Your password has been reset successfully!");
-            // ⭐ TODO: Navigate user to the login screen upon success
-            // router.replace('login'); 
 
-        } catch (err: any) { 
+            Alert.alert("Success 🎉", data.message || "Your password has been reset successfully!");
+            // Navigate user to the login screen upon success
+            router.replace('/auth/login');
+
+        } catch (err: any) {
             console.error("Reset Error:", err);
-            Alert.alert("Error", err.message); 
-        } finally { 
-            setIsLoading(false); 
+            Alert.alert("Error", err.message);
+        } finally {
+            setIsLoading(false);
         }
     };
 
@@ -73,53 +72,53 @@ export default function ResetPassword() {
             <Text style={styles.subtitle}>Enter the email you registered with and the code you received.</Text>
 
             {/* Email Input */}
-            <TextInput 
-                style={styles.input} 
-                placeholder="Email Address" 
+            <TextInput
+                style={styles.input}
+                placeholder="Email Address"
                 placeholderTextColor="#999"
-                value={email} 
-                onChangeText={setEmail} 
+                value={email}
+                onChangeText={setEmail}
                 keyboardType="email-address"
                 autoCapitalize="none"
             />
-            
+
             {/* Code Input (often sent via email/SMS) */}
-            <TextInput 
-                style={styles.input} 
-                placeholder="Verification Code" 
+            <TextInput
+                style={styles.input}
+                placeholder="Verification Code"
                 placeholderTextColor="#999"
-                value={code} 
+                value={code}
                 onChangeText={setCode}
                 keyboardType="numeric"
             />
 
             {/* New Password Input with Toggle */}
             <View style={styles.passwordInputContainer}>
-                <TextInput 
-                    style={styles.passwordInput} 
-                    placeholder="New Password (min 8 chars)" 
+                <TextInput
+                    style={styles.passwordInput}
+                    placeholder="New Password (min 8 chars)"
                     placeholderTextColor="#999"
-                    secureTextEntry={!passwordVisible} 
-                    value={newPassword} 
+                    secureTextEntry={!passwordVisible}
+                    value={newPassword}
                     onChangeText={setNewPassword}
                     autoCapitalize="none"
                 />
-                <TouchableOpacity 
+                <TouchableOpacity
                     onPress={() => setPasswordVisible(!passwordVisible)}
                     style={styles.eyeButton}
                 >
-                    <Ionicons 
-                        name={passwordVisible ? "eye-off-outline" : "eye-outline"} 
-                        size={20} 
-                        color="#8E2DE2" 
+                    <Ionicons
+                        name={passwordVisible ? "eye-off-outline" : "eye-outline"}
+                        size={20}
+                        color="#8E2DE2"
                     />
                 </TouchableOpacity>
             </View>
 
             {/* Reset Button */}
-            <TouchableOpacity 
-                style={[styles.button, isLoading && styles.buttonDisabled]} 
-                onPress={handleReset} 
+            <TouchableOpacity
+                style={[styles.button, isLoading && styles.buttonDisabled]}
+                onPress={handleReset}
                 disabled={isLoading}
             >
                 {isLoading ? (
@@ -134,16 +133,16 @@ export default function ResetPassword() {
 }
 
 const styles = StyleSheet.create({
-    container: { 
-        flex: 1, 
-        justifyContent: "center", 
-        alignItems: "center", 
+    container: {
+        flex: 1,
+        justifyContent: "center",
+        alignItems: "center",
         paddingHorizontal: 30, // Increased padding
         backgroundColor: "#f5f5f5" // Lighter background 
     },
-    title: { 
+    title: {
         fontSize: 28, // Larger title
-        fontWeight: "bold", 
+        fontWeight: "bold",
         marginBottom: 10,
         color: '#333',
     },
@@ -153,11 +152,11 @@ const styles = StyleSheet.create({
         textAlign: 'center',
         marginBottom: 30,
     },
-    input: { 
-        width: "100%", 
-        borderWidth: 1, 
+    input: {
+        width: "100%",
+        borderWidth: 1,
         borderColor: "#ddd", // Lighter border
-        borderRadius: 10, 
+        borderRadius: 10,
         padding: 15, // Increased padding
         marginBottom: 15, // Reduced margin
         backgroundColor: '#fff',
@@ -167,7 +166,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         width: "100%",
-        borderWidth: 1, 
+        borderWidth: 1,
         borderColor: "#ddd",
         borderRadius: 10,
         marginBottom: 20,
@@ -181,11 +180,11 @@ const styles = StyleSheet.create({
     eyeButton: {
         padding: 10,
     },
-    button: { 
-        backgroundColor: "#8E2DE2", 
+    button: {
+        backgroundColor: "#8E2DE2",
         padding: 18, // Larger touch area
-        borderRadius: 10, 
-        width: "100%", 
+        borderRadius: 10,
+        width: "100%",
         alignItems: "center",
         elevation: 3, // Shadow for Android
         shadowColor: '#000', // Shadow for iOS
@@ -196,8 +195,8 @@ const styles = StyleSheet.create({
     buttonDisabled: {
         backgroundColor: '#A98BDC', // Faded color when disabled
     },
-    buttonText: { 
-        color: "#fff", 
+    buttonText: {
+        color: "#fff",
         fontWeight: "700", // Bolder text
         fontSize: 16,
     },

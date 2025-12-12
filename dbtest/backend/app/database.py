@@ -40,6 +40,50 @@ def init_db():
         )
     """)
     conn.commit()
+    
+    # --- Store Tables ---
+    c.execute("""
+        IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='Store' AND xtype='U')
+        CREATE TABLE Store (
+            store_id INT IDENTITY(1,1) PRIMARY KEY,
+            store_name NVARCHAR(100) NOT NULL,
+            store_image NVARCHAR(MAX)
+        )
+    """)
+
+    c.execute("""
+        IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='ProductCategory' AND xtype='U')
+        CREATE TABLE ProductCategory (
+            product_category_id INT IDENTITY(1,1) PRIMARY KEY,
+            category_name NVARCHAR(100) NOT NULL,
+            category_description NVARCHAR(255)
+        )
+    """)
+
+    c.execute("""
+        IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='Product' AND xtype='U')
+        CREATE TABLE Product (
+            product_id INT IDENTITY(1,1) PRIMARY KEY,
+            store_id INT FOREIGN KEY REFERENCES Store(store_id),
+            product_category_id INT FOREIGN KEY REFERENCES ProductCategory(product_category_id),
+            product_name NVARCHAR(100) NOT NULL,
+            product_description NVARCHAR(255),
+            product_image NVARCHAR(MAX),
+            price NVARCHAR(50)
+        )
+    """)
+
+    c.execute("""
+        IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='Wardrobe' AND xtype='U')
+        CREATE TABLE Wardrobe (
+            wardrobe_id INT IDENTITY(1,1) PRIMARY KEY,
+            user_id INT FOREIGN KEY REFERENCES users(id),
+            product_id INT FOREIGN KEY REFERENCES Product(product_id),
+            date_time_stamp DATETIME DEFAULT GETDATE()
+        )
+    """)
+
+    conn.commit()
     conn.close()
     print("Database initialized")
 

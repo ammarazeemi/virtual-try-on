@@ -82,7 +82,10 @@ export default function HomeScreen() {
                     >
                         <TouchableOpacity
                             style={styles.cardTouch}
-                            onPress={() => router.push("/wishlist" as any)}
+                            onPress={() => {
+                                // Simple prevention of double clicks
+                                router.push("/wishlist" as any);
+                            }}
                             activeOpacity={0.9}
                         >
                             <LinearGradient

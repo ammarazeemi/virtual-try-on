@@ -1,3 +1,4 @@
+import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useState, useEffect } from "react";
@@ -148,6 +149,13 @@ export default function AvatarResultScreen() {
           >
             <View style={styles.topButtons}>
               <TouchableOpacity
+                style={styles.backButton}
+                onPress={() => router.back()}
+              >
+                <Ionicons name="arrow-back" size={24} color="#fff" />
+              </TouchableOpacity>
+
+              <TouchableOpacity
                 style={[styles.actionButton, styles.saveButton, saving && { opacity: 0.6 }]}
                 disabled={saving}
                 onPress={handleSave}
@@ -198,6 +206,13 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     width: "88%",
     zIndex: 10,
+    alignItems: 'center',
+  },
+  backButton: {
+    padding: 10,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    borderRadius: 20,
+    marginRight: 10,
   },
   actionButton: {
     flex: 1,

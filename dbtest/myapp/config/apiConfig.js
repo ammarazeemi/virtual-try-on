@@ -23,20 +23,20 @@
 
 //console.log("Device IPv4 Address:", getIPv4Address());
 // export default API;
-const API_URL = "http://192.168.100.5:8000";
+export const API_URL = "http://192.168.100.5:8000";
 
 const API = {
-  aapi:`${API_URL}`,
+  aapi: `${API_URL}`,
   REGISTER: `${API_URL}/auth/register-request`,
   LOGIN: `${API_URL}/auth/login`,
   Email_VERIFY: `${API_URL}/auth/register-verify`,
   RESET_PASSWORD: `${API_URL}/auth/reset-password`,
   SEND_FORGOT_OTP: `${API_URL}/auth/forgot-password`,
-  
 
-    // 🆕 Avatar-related endpoints
 
-    // ✅ Updated avatar endpoints
+  // 🆕 Avatar-related endpoints
+
+  // ✅ Updated avatar endpoints
   // GENERATE_TEMP_AVATAR: `${API_URL}/avatar/generate-temp-avatar`,
   // SAVE_AVATAR: `${API_URL}/avatar/save-avatar`,
   // GET_AVATARS: `${API_URL}/avatar/get-avatars`,

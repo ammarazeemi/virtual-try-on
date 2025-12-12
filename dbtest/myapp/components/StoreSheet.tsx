@@ -14,6 +14,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { storeData } from '../constants/storeData';
 import { useStoreAnimation } from '../context/StoreAnimationContext';
 import { useWishlist } from '../app/context/WishlistContext';
+import { API_URL } from '../config/apiConfig';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -27,6 +28,50 @@ export default function GlobalStoreSheet() {
     const [currentView, setCurrentView] = useState<'brands' | 'categories' | 'clothes'>('brands');
     const [selectedBrandId, setSelectedBrandId] = useState<string | null>(null);
     const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
+
+    // State for store data
+    const [storeData, setStoreData] = useState<any>({ brands: [], categories: {}, clothes: {} });
+    const [loading, setLoading] = useState(true);
+
+    // Fetch store data
+    React.useEffect(() => {
+        const fetchStoreData = async () => {
+            try {
+                console.log("Fetching store data from:", `${API_URL}/store/data`);
+                // Add timeout to fetch
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 seconds timeout
+
+                const response = await fetch(`${API_URL}/store/data`, { signal: controller.signal });
+                clearTimeout(timeoutId);
+
+                if (response.ok) {
+                    const data = await response.json();
+                    console.log("Store data fetched successfully:", JSON.stringify(data, null, 2));
+                    if (data.brands && data.brands.length > 0) {
+                        console.log("Brands found:", data.brands.length);
+                        setStoreData(data);
+                    } else {
+                        console.warn("No brands found in store data");
+                    }
+                } else {
+                    console.error("Failed to fetch store data:", response.status);
+                    Alert.alert("Error", "Failed to load store data. Server returned " + response.status);
+                }
+            } catch (error: any) {
+                console.error("Error fetching store data:", error);
+                if (error.name === 'AbortError') {
+                    Alert.alert("Error", "Request timed out. Check your network connection.");
+                } else {
+                    Alert.alert("Error", "Could not connect to server. " + error.message);
+                }
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchStoreData();
+    }, []);
 
     const SNAP_POINT_50 = -SCREEN_HEIGHT * 0.3;
     const SNAP_POINT_70 = -SCREEN_HEIGHT * 0.7;
@@ -174,14 +219,24 @@ export default function GlobalStoreSheet() {
     };
 
     const handleAddToWishlist = (item: any) => {
-        addToWishlist(item);
-        Alert.alert('Added to Wishlist', `${item.name} has been added to your wishlist!`);
+        console.log("handleAddToWishlist clicked for:", item);
+        try {
+            addToWishlist(item);
+            Alert.alert('Added to Wishlist', `${item.name} has been added to your wishlist!`);
+        } catch (e) {
+            console.error("Error in handleAddToWishlist:", e);
+            Alert.alert("Error", "Failed to add to wishlist");
+        }
+    };
+
+    const handleTryOn = (item: any) => {
+        Alert.alert("Success", `${item.name} is applied!`);
     };
 
     const getTitle = () => {
         if (currentView === 'brands') return 'Browse Brands';
         if (currentView === 'categories') {
-            const brand = storeData.brands.find(b => b.id === selectedBrandId);
+            const brand = storeData.brands.find((b: any) => b.id === selectedBrandId);
             return brand?.name || 'Categories';
         }
         if (currentView === 'clothes') {
@@ -199,16 +254,28 @@ export default function GlobalStoreSheet() {
 
 
     const renderContent = () => {
+        if (loading) {
+            return (
+                <View style={{ padding: 20, alignItems: 'center' }}>
+                    <Text style={{ color: '#fff' }}>Loading store data...</Text>
+                </View>
+            );
+        }
+
         if (currentView === 'brands') {
             return (
                 <View style={styles.grid}>
-                    {storeData.brands.map((brand) => (
+                    {storeData.brands.map((brand: any) => (
                         <TouchableOpacity
                             key={brand.id}
                             style={styles.card}
                             onPress={() => navigateToBrand(brand.id)}
                         >
-                            <Image source={{ uri: brand.image }} style={styles.brandstyle} />
+                            {brand.image ? (
+                                <Image source={{ uri: brand.image }} style={styles.brandstyle} />
+                            ) : (
+                                <View style={styles.brandstyle} />
+                            )}
                             <Text style={styles.brandName}>{brand.name}</Text>
                             <Text style={styles.brandDesc}>{brand.description}</Text>
                         </TouchableOpacity>
@@ -222,7 +289,7 @@ export default function GlobalStoreSheet() {
 
             return (
                 <View style={styles.listContainer}>
-                    {categories.map((category) => (
+                    {categories.map((category: any) => (
                         <TouchableOpacity
                             key={category.id}
                             style={styles.listItem}
@@ -247,12 +314,22 @@ export default function GlobalStoreSheet() {
             return (
                 <>
                     <View style={styles.grid}>
-                        {clothes.map((item) => (
+                        {clothes.map((item: any) => (
                             <View key={item.id} style={styles.itemCard}>
-                                <Image source={item.image} style={styles.itemImage} />
+                                {item.image ? (
+                                    <Image source={{ uri: item.image }} style={styles.itemImage} />
+                                ) : (
+                                    <View style={[styles.itemImage, { backgroundColor: '#444' }]} />
+                                )}
                                 <View style={styles.itemInfo}>
                                     <Text style={styles.itemPrice}>{item.price}</Text>
                                     <Text style={styles.itemName} numberOfLines={1}>{item.name}</Text>
+                                    <TouchableOpacity
+                                        style={styles.tryOnButton}
+                                        onPress={() => handleTryOn(item)}
+                                    >
+                                        <Text style={styles.tryOnButtonText}>Try On</Text>
+                                    </TouchableOpacity>
                                 </View>
                                 <TouchableOpacity
                                     style={styles.addToWishlistButton}
@@ -496,5 +573,17 @@ const styles = StyleSheet.create({
         color: '#fff',
         fontSize: 16,
         fontWeight: '600',
+    },
+    tryOnButton: {
+        backgroundColor: '#4CAF50',
+        marginTop: 8,
+        paddingVertical: 6,
+        borderRadius: 12,
+        alignItems: 'center',
+    },
+    tryOnButtonText: {
+        color: '#fff',
+        fontSize: 12,
+        fontWeight: 'bold',
     },
 });

@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from app.database import init_db
-from app.routes import auth, avatar
+from app.routes import auth, avatar, store
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from app.utils.cartoonizer import load_model  # ✅ NEW
@@ -20,7 +20,7 @@ app.add_middleware(
 )
 
 # ensure uploads folder exists (relative to project backend folder)
-uploads_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "uploads"))
+uploads_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "app", "uploads"))
 os.makedirs(uploads_dir, exist_ok=True)
 
 # mount static so /uploads/<path> serves files from backend/app/uploads
@@ -29,6 +29,7 @@ app.mount("/uploads", StaticFiles(directory=uploads_dir), name="uploads")
 # Include all authentication routes
 app.include_router(auth.router, prefix="/auth", tags=["Authentication"])
 app.include_router(avatar.router, prefix="/avatar", tags=["Avatar Management"])
+app.include_router(store.router, prefix="/store", tags=["Store"])
 
 @app.on_event("startup")  # ✅ MODEL WILL LOAD ONE TIME ONLY
 async def startup_event():

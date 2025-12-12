@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { ClothingItem } from '../constants/storeData';
+import { ClothingItem } from '../../constants/storeData';
 
 interface WishlistContextType {
     wishlist: ClothingItem[];
@@ -21,8 +21,23 @@ export const WishlistProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const loadWishlist = async () => {
         try {
             const storedWishlist = await AsyncStorage.getItem('wishlist');
+            console.log("Loaded wishlist from storage:", storedWishlist);
             if (storedWishlist) {
-                setWishlist(JSON.parse(storedWishlist));
+                const parsed = JSON.parse(storedWishlist);
+                if (Array.isArray(parsed)) {
+                    // Sanitize data: Filter out items where image is not a string (legacy data)
+                    const validItems = parsed.filter(item => typeof item.image === 'string' && item.image.startsWith('http'));
+                    console.log(`Loaded ${parsed.length} items, ${validItems.length} valid.`);
+                    setWishlist(validItems);
+
+                    // Update storage if we filtered out items
+                    if (validItems.length !== parsed.length) {
+                        saveWishlist(validItems);
+                    }
+                } else {
+                    console.error("Stored wishlist is not an array:", parsed);
+                    setWishlist([]); // Reset if corrupted
+                }
             }
         } catch (error) {
             console.error('Failed to load wishlist:', error);
@@ -31,6 +46,7 @@ export const WishlistProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
     const saveWishlist = async (newWishlist: ClothingItem[]) => {
         try {
+            console.log("Saving wishlist:", newWishlist.length, "items");
             await AsyncStorage.setItem('wishlist', JSON.stringify(newWishlist));
         } catch (error) {
             console.error('Failed to save wishlist:', error);
@@ -38,10 +54,17 @@ export const WishlistProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     };
 
     const addToWishlist = (item: ClothingItem) => {
+        console.log("addToWishlist called with:", item);
+        if (!item || !item.id) {
+            console.error("Invalid item passed to addToWishlist");
+            return;
+        }
         if (!isInWishlist(item.id)) {
             const newWishlist = [...wishlist, item];
             setWishlist(newWishlist);
             saveWishlist(newWishlist);
+        } else {
+            console.log("Item already in wishlist");
         }
     };
 

@@ -104,6 +104,9 @@ export default function UploadAvatarScreen() {
       style={styles.container}
     >
       <View style={styles.card}>
+        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+          <Ionicons name="arrow-back" size={24} color="#333" />
+        </TouchableOpacity>
         <Text style={styles.title}>Upload Your Full-Body Photo</Text>
 
         {image ? (
@@ -153,6 +156,16 @@ const styles = StyleSheet.create({
     width: "85%",
     backgroundColor: "rgba(255,255,255,0.2)", // translucent white overlay for glow
     elevation: 0, // no black shadow
+    position: 'relative',
+  },
+  backButton: {
+    position: 'absolute',
+    top: 20,
+    left: 20,
+    zIndex: 10,
+    padding: 5,
+    backgroundColor: 'rgba(255,255,255,0.5)',
+    borderRadius: 20,
   },
   title: {
     fontSize: 22,
