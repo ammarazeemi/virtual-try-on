@@ -14,9 +14,11 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useStoreAnimation } from "../context/StoreAnimationContext";
 
 export default function HomeScreen() {
     const router = useRouter();
+    const { openStore } = useStoreAnimation();
     const [userId, setUserId] = useState<string | null>(null);
 
     useEffect(() => {
@@ -83,8 +85,9 @@ export default function HomeScreen() {
                         <TouchableOpacity
                             style={styles.cardTouch}
                             onPress={() => {
-                                // Simple prevention of double clicks
-                                router.push("/wishlist" as any);
+                                // Open Store Sheet directly to Wishlist view
+                                console.log("Home: Opening store to wishlist");
+                                openStore('wishlist');
                             }}
                             activeOpacity={0.9}
                         >

@@ -5,6 +5,7 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { WishlistProvider } from "./context/WishlistContext";
 import { StoreAnimationProvider } from "../context/StoreAnimationContext";
 import GlobalStoreSheet from "../components/StoreSheet";
+import NotificationToast from "../components/NotificationToast";
 
 export default function RootLayout() {
   const segments = useSegments() as string[];
@@ -32,6 +33,7 @@ export default function RootLayout() {
           </Stack>
           {!hideStoreSheet && <GlobalStoreSheet />}
           <StatusBar style="auto" />
+          <NotificationToast />
         </WishlistProvider>
       </StoreAnimationProvider>
     </GestureHandlerRootView>

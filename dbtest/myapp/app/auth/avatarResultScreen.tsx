@@ -16,13 +16,13 @@ import Animated, { useAnimatedStyle, interpolate, Extrapolate } from "react-nati
 import API from "../../config/apiConfig";
 import { useStoreAnimation } from "../../context/StoreAnimationContext";
 
-type Params = { userId: string; avatarPath: string };
+type Params = { userId: string; avatarPath: string; tryOnItem?: string; tryOnImage?: string };
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 export default function AvatarResultScreen() {
   const router = useRouter();
-  const { userId, avatarPath } = useLocalSearchParams<Params>();
+  const { userId, avatarPath, tryOnItem, tryOnImage } = useLocalSearchParams<Params>();
   const [saving, setSaving] = useState(false);
   const { translateY, maxSnapPoint, showBackdrop } = useStoreAnimation();
 
@@ -37,6 +37,21 @@ export default function AvatarResultScreen() {
       showBackdrop.value = true; // Re-enable backdrop
     };
   }, []);
+
+  // Show notification if trying on an item
+  useEffect(() => {
+    if (tryOnItem) {
+      // Simple alert for now, or we could use a custom toast component
+      // Since we want a "pop notification", let's use a timeout to simulate it appearing after transition
+      setTimeout(() => {
+        Alert.alert(
+          "✨ Try On Successful!",
+          `You are now wearing ${tryOnItem}.`,
+          [{ text: "Awesome!" }]
+        );
+      }, 500);
+    }
+  }, [tryOnItem]);
 
   const handleSave = async () => {
     setSaving(true);

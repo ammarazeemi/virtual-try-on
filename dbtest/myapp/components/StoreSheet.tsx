@@ -9,23 +9,24 @@ import Animated, {
     withTiming,
 } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useRouter, usePathname } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { storeData } from '../constants/storeData';
 import { useStoreAnimation } from '../context/StoreAnimationContext';
 import { useWishlist } from '../app/context/WishlistContext';
 import { API_URL } from '../config/apiConfig';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 export default function GlobalStoreSheet() {
     const router = useRouter();
-    const { translateY, maxSnapPoint, showBackdrop } = useStoreAnimation();
-    const { addToWishlist } = useWishlist();
+    const { translateY, maxSnapPoint, showBackdrop, requestedView, setRequestedView, showNotification } = useStoreAnimation();
+    const { addToWishlist, wishlist, removeFromWishlist } = useWishlist();
     const context = useSharedValue({ y: 0 });
     const isOpen = useSharedValue(false);
 
-    const [currentView, setCurrentView] = useState<'brands' | 'categories' | 'clothes'>('brands');
+    const [currentView, setCurrentView] = useState<'brands' | 'categories' | 'clothes' | 'wishlist'>('brands');
     const [selectedBrandId, setSelectedBrandId] = useState<string | null>(null);
     const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
 
@@ -71,7 +72,19 @@ export default function GlobalStoreSheet() {
         };
 
         fetchStoreData();
+        fetchStoreData();
     }, []);
+
+    // Handle requested view from context (e.g. opening wishlist from home)
+    // Handle requested view from context (e.g. opening wishlist from home)
+    React.useEffect(() => {
+        console.log("StoreSheet: requestedView changed to", requestedView);
+        if (requestedView) {
+            setCurrentView(requestedView);
+            expandSheet();
+            setRequestedView(null); // Reset so we don't loop or re-open unexpectedly
+        }
+    }, [requestedView]);
 
     const SNAP_POINT_50 = -SCREEN_HEIGHT * 0.3;
     const SNAP_POINT_70 = -SCREEN_HEIGHT * 0.7;
@@ -181,6 +194,8 @@ export default function GlobalStoreSheet() {
         } else if (currentView === 'categories') {
             setCurrentView('brands');
             setSelectedBrandId(null);
+        } else if (currentView === 'wishlist') {
+            setCurrentView('brands');
         } else {
             closeSheet();
         }
@@ -229,12 +244,35 @@ export default function GlobalStoreSheet() {
         }
     };
 
-    const handleTryOn = (item: any) => {
-        Alert.alert("Success", `${item.name} is applied!`);
+    const pathname = usePathname();
+
+    const handleTryOn = async (item: any) => {
+        try {
+            const userId = await AsyncStorage.getItem("userId");
+            if (!userId) {
+                Alert.alert("Error", "Please log in to try on items.");
+                return;
+            }
+
+            // Close sheet first
+            closeSheet();
+
+            // Just show a notification that we are "trying on" the item
+            // In a real app, this might update a context or send a command to the backend
+            // to update the avatar in the background, but for now we just confirm the action.
+            setTimeout(() => {
+                showNotification(`You are now wearing ${item.name}`, 'success');
+            }, 300); // Wait for sheet to close a bit
+
+        } catch (error) {
+            console.error("Try On Error:", error);
+            Alert.alert("Error", "Failed to initiate Try On.");
+        }
     };
 
     const getTitle = () => {
         if (currentView === 'brands') return 'Browse Brands';
+        if (currentView === 'wishlist') return 'My Wishlist';
         if (currentView === 'categories') {
             const brand = storeData.brands.find((b: any) => b.id === selectedBrandId);
             return brand?.name || 'Categories';
@@ -248,9 +286,10 @@ export default function GlobalStoreSheet() {
     };
     // Function to expand the sheet to 70% when navigating
     const expandSheet = useCallback(() => {
-        'worklet'; // Ensure this is callable from worklets if needed, but here it's fine outside.
+        console.log("Expanding sheet to 70%");
         scrollTo(SNAP_POINT_70);
-    }, [scrollTo, SNAP_POINT_70]); // Add this new function
+        isOpen.value = true;
+    }, [scrollTo, SNAP_POINT_70]);
 
 
     const renderContent = () => {
@@ -351,6 +390,47 @@ export default function GlobalStoreSheet() {
                 </>
             );
         }
+
+        if (currentView === 'wishlist') {
+            if (wishlist.length === 0) {
+                return (
+                    <View style={{ alignItems: 'center', marginTop: 50 }}>
+                        <Ionicons name="heart-outline" size={60} color="#666" />
+                        <Text style={{ color: '#aaa', marginTop: 10, fontSize: 16 }}>Your wishlist is empty</Text>
+                    </View>
+                );
+            }
+
+            return (
+                <View style={styles.grid}>
+                    {wishlist.map((item: any) => (
+                        <View key={item.id} style={styles.itemCard}>
+                            {item.image ? (
+                                <Image source={{ uri: item.image }} style={styles.itemImage} />
+                            ) : (
+                                <View style={[styles.itemImage, { backgroundColor: '#444' }]} />
+                            )}
+                            <View style={styles.itemInfo}>
+                                <Text style={styles.itemPrice}>{item.price}</Text>
+                                <Text style={styles.itemName} numberOfLines={1}>{item.name}</Text>
+                                <TouchableOpacity
+                                    style={styles.tryOnButton}
+                                    onPress={() => handleTryOn(item)}
+                                >
+                                    <Text style={styles.tryOnButtonText}>Try On</Text>
+                                </TouchableOpacity>
+                            </View>
+                            <TouchableOpacity
+                                style={[styles.addToWishlistButton, { backgroundColor: '#FF4B4B' }]}
+                                onPress={() => removeFromWishlist(item.id)}
+                            >
+                                <Ionicons name="close" size={16} color="#fff" />
+                            </TouchableOpacity>
+                        </View>
+                    ))}
+                </View>
+            );
+        }
     };
 
     return (
@@ -372,7 +452,13 @@ export default function GlobalStoreSheet() {
                             <Text style={styles.title}>{getTitle()}</Text>
                         </View>
                         <View style={styles.headerButtons}>
-                            <TouchableOpacity onPress={() => router.push('/wishlist' as any)} style={styles.wishlistButton}>
+                            <TouchableOpacity
+                                onPress={() => {
+                                    setCurrentView('wishlist');
+                                    expandSheet();
+                                }}
+                                style={styles.wishlistButton}
+                            >
                                 <Ionicons name="heart-outline" size={20} color="#fff" />
                             </TouchableOpacity>
                             <TouchableOpacity onPress={closeSheet} style={styles.closeButton}>

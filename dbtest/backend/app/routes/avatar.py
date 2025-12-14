@@ -18,7 +18,7 @@ from app.database import get_connection
 router = APIRouter()
 
 # Base folders (inside backend project)
-BASE_UPLOAD_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "uploads")
+BASE_UPLOAD_DIR = os.path.join(os.path.dirname(__file__), "..", "uploads")
 USER_UPLOAD_DIR = os.path.join(BASE_UPLOAD_DIR, "user_images")
 AVATAR_BASE_DIR = os.path.join(BASE_UPLOAD_DIR, "avatars")
 AVATAR_TEMP_DIR = os.path.join(AVATAR_BASE_DIR, "temp")
@@ -46,8 +46,10 @@ async def upload_avatar(user_id: int = Form(...), file: UploadFile = File(...)):
         with open(save_path, "wb") as f:
             f.write(await file.read())
 
-        # Return relative path that frontend (and server) can use
-        rel_path = os.path.relpath(save_path).replace("\\", "/")  # e.g. uploads/user_images/...
+        # Return relative path starting with 'uploads/'
+        # We want path relative to 'app' folder, so it looks like 'uploads/user_images/...'
+        app_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+        rel_path = os.path.relpath(save_path, app_dir).replace("\\", "/")
         return JSONResponse(content={"status": "ok", "temp_image_path": rel_path})
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Upload failed: {e}")
@@ -107,7 +109,8 @@ async def generate_avatar(userId: int = Form(...), file: UploadFile = File(...))
         # Remove original immediately ✅
         os.remove(temp_input)
 
-        rel_out = os.path.relpath(avatar_output).replace("\\", "/")
+        app_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+        rel_out = os.path.relpath(avatar_output, app_dir).replace("\\", "/")
         return JSONResponse(content={"status": "ok", "avatar_path": rel_out})
 
     except Exception as e:
@@ -218,7 +221,8 @@ async def save_avatar(userId: int = Form(...), avatarPath: str = Form(...)):
         conn.commit()
         conn.close()
 
-        rel_dest = os.path.relpath(dest).replace("\\", "/")
+        app_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+        rel_dest = os.path.relpath(dest, app_dir).replace("\\", "/")
         return JSONResponse(content={"status": "ok", "saved_path": rel_dest})
 
     except Exception as e:
@@ -241,7 +245,8 @@ async def get_avatar(user_id: int):
         # if abs path is inside project uploads, give relative path for frontend
         project_root = os.path.abspath(os.getcwd())
         if abs_path.startswith(project_root):
-            rel = os.path.relpath(abs_path).replace("\\", "/")
+            app_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+            rel = os.path.relpath(abs_path, app_dir).replace("\\", "/")
             return JSONResponse(content={"status": "ok", "avatar_path": rel})
         return JSONResponse(content={"status": "ok", "avatar_path": abs_path})
     except Exception as e:
